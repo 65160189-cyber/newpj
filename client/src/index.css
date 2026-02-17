@@ -1,0 +1,139 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;600;700&display=swap');
+
+body {
+  font-family: 'Kanit', sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #f8fafc;
+}
+
+.tablet-responsive {
+  @apply lg:container lg:mx-auto lg:max-w-7xl;
+}
+
+.card {
+  @apply bg-white rounded-lg shadow-md p-6 border border-gray-200;
+}
+
+.btn {
+  @apply px-4 py-2 rounded-md font-medium transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+}
+
+.btn-primary {
+  @apply btn bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+}
+
+.btn-secondary {
+  @apply btn bg-gray-200 text-gray-800 hover:bg-gray-300 focus:ring-gray-500;
+}
+
+.btn-success {
+  @apply btn bg-green-600 text-white hover:bg-green-700 focus:ring-green-500;
+}
+
+.btn-warning {
+  @apply btn bg-yellow-600 text-white hover:bg-yellow-700 focus:ring-yellow-500;
+}
+
+.btn-danger {
+  @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+}
+
+.input-field {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+}
+
+.status-badge {
+  @apply px-2 py-1 text-xs font-medium rounded-full;
+}
+
+.status-pending {
+  @apply status-badge bg-yellow-100 text-yellow-800;
+}
+
+.status-in-progress {
+  @apply status-badge bg-blue-100 text-blue-800;
+}
+
+.status-completed {
+  @apply status-badge bg-green-100 text-green-800;
+}
+
+.status-cancelled {
+  @apply status-badge bg-red-100 text-red-800;
+}
+
+.priority-high {
+  @apply status-badge bg-red-100 text-red-800;
+}
+
+.priority-medium {
+  @apply status-badge bg-yellow-100 text-yellow-800;
+}
+
+.priority-low {
+  @apply status-badge bg-green-100 text-green-800;
+}
+
+.sidebar-item {
+  @apply flex items-center px-4 py-3 text-gray-700 hover:bg-gray-100 hover:text-blue-600 transition-colors duration-200;
+}
+
+.sidebar-item.active {
+  @apply bg-blue-50 text-blue-600 border-r-4 border-blue-600;
+}
+
+.table-container {
+  @apply overflow-x-auto bg-white rounded-lg shadow;
+}
+
+.table {
+  @apply min-w-full divide-y divide-gray-200;
+}
+
+.table th {
+  @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider bg-gray-50;
+}
+
+.table td {
+  @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+}
+
+.stat-card {
+  @apply bg-white rounded-lg shadow p-6 border-l-4;
+}
+
+.stat-card.primary {
+  @apply border-l-blue-500;
+}
+
+.stat-card.success {
+  @apply border-l-green-500;
+}
+
+.stat-card.warning {
+  @apply border-l-yellow-500;
+}
+
+.stat-card.danger {
+  @apply border-l-red-500;
+}
+
+@media (max-width: 768px) {
+  .tablet-responsive {
+    @apply px-4;
+  }
+  
+  .card {
+    @apply p-4;
+  }
+  
+  .table th,
+  .table td {
+    @apply px-3 py-2 text-xs;
+  }
+}
