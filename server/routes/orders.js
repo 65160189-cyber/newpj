@@ -1,8 +1,12 @@
 const express = require('express');
+const multer = require('multer');
 const { authenticateToken } = require('../middleware/auth');
 const { getDatabase } = require('../database/init');
 
 const router = express.Router();
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
 
 router.get('/', authenticateToken, (req, res) => {
   const db = getDatabase();
@@ -151,6 +155,139 @@ router.get('/:id/history', authenticateToken, (req, res) => {
   });
   
   db.close();
+});
+
+router.post('/import', authenticateToken, upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'No file uploaded' });
+  }
+
+  try {
+    const XLSX = require('xlsx');
+    const workbook = XLSX.read(req.file.buffer, { type: 'buffer' });
+    
+    // ดึงข้อมูลจาก Sheet3 (index 2)
+    const sheetIndex = 2; // Sheet3 = index 2
+    if (!workbook.SheetNames[sheetIndex]) {
+      return res.status(400).json({ success: false, message: 'Sheet3 not found in file' });
+    }
+    
+    const sheetName = workbook.SheetNames[sheetIndex];
+    const worksheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+    if (data.length < 2) {
+      return res.status(400).json({ success: false, message: 'Sheet3 is empty or invalid' });
+    }
+
+    // หา index ของคอลัมน์ที่ต้องการ
+    const headers = data[0];
+    const columnMapping = {
+      kanbanId: -1,
+      customer: -1,
+      salePart: -1,
+      orderNo: -1,
+      deliveryDate: -1,
+      qty: -1
+    };
+
+    headers.forEach((header, index) => {
+      const headerText = header.toString().toLowerCase().trim();
+      if (headerText.includes('kanban') || headerText.includes('id')) {
+        columnMapping.kanbanId = index;
+      } else if (headerText.includes('customer')) {
+        columnMapping.customer = index;
+      } else if (headerText.includes('sale') || headerText.includes('part')) {
+        columnMapping.salePart = index;
+      } else if (headerText.includes('order') || headerText.includes('no')) {
+        columnMapping.orderNo = index;
+      } else if (headerText.includes('delivery') || headerText.includes('date')) {
+        columnMapping.deliveryDate = index;
+      } else if (headerText.includes('qty') || headerText.includes('quantity')) {
+        columnMapping.qty = index;
+      }
+    });
+
+    // ตรวจสอบว่าหาคอลัมน์ที่ต้องการครบหรือไม่
+    const missingColumns = Object.keys(columnMapping).filter(key => columnMapping[key] === -1);
+    if (missingColumns.length > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `Missing required columns: ${missingColumns.join(', ')}`,
+        foundHeaders: headers
+      });
+    }
+
+    const rows = data.slice(1);
+    const db = getDatabase();
+    let imported = 0;
+    let errors = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.length === 0 || !row[columnMapping.kanbanId]) continue;
+
+      try {
+        const orderData = {
+          orderNumber: row[columnMapping.orderNo] || `ORD${row[columnMapping.kanbanId] || Date.now()}${i}`,
+          customerName: row[columnMapping.customer] || 'Unknown Customer',
+          productName: row[columnMapping.salePart] || 'Unknown Product',
+          quantity: parseInt(row[columnMapping.qty]) || 1,
+          deliveryDate: row[columnMapping.deliveryDate] || '',
+          kanbanId: row[columnMapping.kanbanId] || '',
+          priority: 'medium',
+          notes: `Imported from Sheet3 - Kanban ID: ${row[columnMapping.kanbanId]}`,
+          status: 'pending',
+          createdBy: req.user.id,
+          createdAt: new Date().toISOString()
+        };
+
+        await new Promise((resolve, reject) => {
+          const query = `
+            INSERT INTO orders (order_number, customer_name, product_name, quantity, delivery_date, kanban_id, priority, notes, status, created_by, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+          db.run(query, [
+            orderData.orderNumber,
+            orderData.customerName,
+            orderData.productName,
+            orderData.quantity,
+            orderData.deliveryDate,
+            orderData.kanbanId,
+            orderData.priority,
+            orderData.notes,
+            orderData.status,
+            orderData.createdBy,
+            orderData.createdAt
+          ], function(err) {
+            if (err) reject(err);
+            else resolve(this.lastID);
+          });
+        });
+
+        imported++;
+      } catch (error) {
+        errors.push(`Row ${i + 2}: ${error.message}`);
+      }
+    }
+
+    db.close();
+
+    res.json({
+      success: true,
+      imported,
+      total: rows.length,
+      errors: errors.slice(0, 10),
+      message: `Successfully imported ${imported} orders from Sheet3`
+    });
+
+  } catch (error) {
+    console.error('Import error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to process file: ' + error.message 
+    });
+  }
 });
 
 module.exports = router;

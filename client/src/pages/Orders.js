@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../context/SocketContext';
 import { orderService } from '../services/orderService';
-import { Plus, Search, Filter, Eye, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Filter, Eye, Edit, Trash2, Upload, FileSpreadsheet } from 'lucide-react';
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
@@ -14,6 +14,9 @@ const Orders = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [orderHistory, setOrderHistory] = useState([]);
+  const [importing, setImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState(0);
+  const fileInputRef = useRef(null);
   const { socket } = useSocket();
 
   const [formData, setFormData] = useState({
@@ -153,6 +156,60 @@ const Orders = () => {
     low: 'ต่ำ'
   };
 
+  const handleFileImport = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportProgress(0);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await orderService.importOrders(formData);
+      
+      if (response.data.success) {
+        alert(`นำเข้าข้อมูลสำเร็จ! ${response.data.imported} รายการ`);
+        fetchOrders();
+      } else {
+        alert('นำเข้าข้อมูลล้มเหลว: ' + response.data.message);
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      alert('นำเข้าข้อมูลล้มเหลว');
+    } finally {
+      setImporting(false);
+      setImportProgress(0);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const downloadTemplate = () => {
+    const template = [
+      ['KanbanID', 'Customer', 'Sale Part', 'Order No1', 'Delivery Date', 'Qty'],
+      ['KB001', 'บริษัท A', 'สินค้า X', 'ORD001', '2024-01-15', '100'],
+      ['KB002', 'บริษัท B', 'สินค้า Y', 'ORD002', '2024-01-20', '50']
+    ];
+    
+    const csvContent = template.map(row => row.join(',')).join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'order_template_sheet3.csv');
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -193,14 +250,56 @@ const Orders = () => {
               <option value="cancelled">ยกเลิก</option>
             </select>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-primary flex items-center"
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            สร้างคำสั่งซื้อ
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={downloadTemplate}
+              className="btn-secondary flex items-center"
+              title="ดาวน์โหลดเทมเพลต"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              เทมเพลต
+            </button>
+            <button
+              onClick={handleImportClick}
+              disabled={importing}
+              className="btn-success flex items-center"
+              title="นำเข้าไฟล์ Excel/CSV"
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              {importing ? 'กำลังนำเข้า...' : 'นำเข้า'}
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn-primary flex items-center"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              สร้างคำสั่งซื้อ
+            </button>
+          </div>
         </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          onChange={handleFileImport}
+          className="hidden"
+        />
+
+        {importing && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-gray-600">กำลังนำเข้าข้อมูล...</span>
+              <span className="text-sm text-gray-600">{importProgress}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ width: `${importProgress}%` }}
+              ></div>
+            </div>
+          </div>
+        )}
 
         <div className="table-container">
           <table className="table">
